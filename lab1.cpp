@@ -1,4 +1,3 @@
-//
 //modified by: Rodrigo Ortiz
 //date:
 //
@@ -28,7 +27,6 @@
 //   .gravity
 //   .collision detection
 //   .more objects
-//
 
 
 #include <iostream>
@@ -50,8 +48,14 @@ using namespace std;
 #include "log.h"
 
 
-const int MAX_PARTICLES = 2000;
-const float GRAVITY     = 0.1;
+// test every particle for collison
+// make an array of boxes
+
+// use glRotate to make the boxes have weight when particles touch
+
+
+const int MAX_PARTICLES = 5000;
+const float GRAVITY     = .1;
 
 //some structures
 
@@ -73,7 +77,11 @@ struct Particle {
 class Global {
     public:
         int xres, yres;
-        Shape box;
+        Shape box[5];
+        Shape circle;
+        int moveBox[5];
+        char boxText[5][20];
+
         Particle particle[MAX_PARTICLES];
         int n;
         Global();
@@ -99,9 +107,7 @@ void check_mouse(XEvent *e);
 int check_keys(XEvent *e);
 void movement();
 void render();
-
-
-extern void ggprint8b(Shape *s, int advance, int cref, const char *fmt, ...);
+void makeParticle(int x, int y);
 
 //=====================================
 // MAIN FUNCTION IS HERE
@@ -119,6 +125,12 @@ int main()
             check_mouse(&e);
             done = check_keys(&e);
         }
+
+        // Make particles without any input
+        for (int i = 0; i < 5; i++) {
+            makeParticle(150, 640);
+        }
+
         movement();
         render();
         x11.swapBuffers();
@@ -133,11 +145,32 @@ Global::Global()
 {
     xres = 800;
     yres = 600;
+
     //define a box shape
-    box.width = 100;
-    box.height = 10;
-    box.center.x = 120 + 5*65;
-    box.center.y = 500 - 5*60;
+    for (int i = 0; i < 5; i++) {
+        box[i].width = 80;
+        box[i].height = 10;
+        box[i].center.x = 100 + 65 * i;
+        box[i].center.y = 500 - 60 * i;
+    }
+
+    //define circle
+    circle.radius = 130;
+    circle.center.x = 500;
+    circle.center.y = 0;
+
+    strcpy(boxText[0], "Requirements");
+    strcpy(boxText[1], "Design");
+    strcpy(boxText[2], "Coding");
+    strcpy(boxText[3], "Testing");
+    strcpy(boxText[4], "Maintenance");
+
+    moveBox[0] = 38;
+    moveBox[1] = 18;
+    moveBox[2] = 17;
+    moveBox[3] = 19;
+    moveBox[4] = 32;
+
     n = 0;
 }
 
@@ -230,13 +263,12 @@ void makeParticle(int x, int y)
     //
     if (g.n >= MAX_PARTICLES)
         return;
-    cout << "makeParticle() " << x << " " << y << endl;
     //set position of particle
     Particle *p = &g.particle[g.n];
     p->s.center.x = x;
     p->s.center.y = y;
-    p->velocity.y = ((double)rand() / (double)RAND_MAX) - 0.5;
-    p->velocity.x = ((double)rand() / (double)RAND_MAX) - 0.5 + 0.25;
+    p->velocity.y = ((double)rand() / (double)RAND_MAX);
+    p->velocity.x = ((double)rand() / (double)RAND_MAX);
     ++g.n;
 }
 
@@ -260,17 +292,11 @@ void check_mouse(XEvent *e)
         if (e->xbutton.button==1) {
             //Left button was pressed.
             int y = g.yres - e->xbutton.y;
-            makeParticle(e->xbutton.x, y);
-            makeParticle(e->xbutton.x, y);
-            makeParticle(e->xbutton.x, y);
-            makeParticle(e->xbutton.x, y);
-            makeParticle(e->xbutton.x, y);
-            makeParticle(e->xbutton.x, y);
-            makeParticle(e->xbutton.x, y);
-            makeParticle(e->xbutton.x, y);
-            makeParticle(e->xbutton.x, y);
-            makeParticle(e->xbutton.x, y);
-            makeParticle(e->xbutton.x, y);
+
+            for (int i = 0; i < 10; i++)
+            {
+                makeParticle(e->xbutton.x, y);
+            }
             return;
         }
         if (e->xbutton.button==3) {
@@ -322,7 +348,7 @@ void movement()
     if (g.n <= 0)
         return;
 
-    for(int i =0; i<g.n; i++)
+    for(int i = 0; i < g.n; i++)
     {
 
         Particle *p = &g.particle[i];
@@ -332,26 +358,46 @@ void movement()
 
         //check for collision with shapes...
         //Shape *s;
+        for (int j = 0; j < 5; j++) {
+            Shape *s = &g.box[j];
+			
+			if (p->s.center.y < s->center.y + g.box[j].height && 
+					p->s.center.x > g.box[j].center.x - g.box[j].width &&
+					p->s.center.x < g.box[j].center.x + g.box[j].width &&
+                    p->s.center.y > g.box[j].center.y - g.box[j].height) {
+                p->velocity.y = -p->velocity.y;
+                p->velocity.y *= (((float)rand() / 
+                            (4 * (float) RAND_MAX)) + .4);
+            }
 
-        Shape *s = &g.box;
-
-        if(p->s.center.y < s->center.y + s->height &&
-                p->s.center.x > s->center.x - s->width &&
-                p->s.center.x < s->center.x + s->width) {
-
-            p->velocity.y = -p->velocity.y * .8;
+            //check for off-screen
+            if (p->s.center.y < 0.0) {
+                g.particle[i] = g.particle[g.n-1];
+                --g.n;
+            }
         }
 
-        //check for off-screen
-        if (p->s.center.y < 0.0) {
-            // cout << "off screen" << endl;
+        /*
+        // check for collision with circle
+        float squared_x = (p->s.center.x - g.circle.center.x) *
+            (p->s.center.x - g.circle.center.x);
+        float squared_y = (p->s.center.y - g.circle.center.y) *
+            (p->s.center.y - g.circle.center.y);
 
-            g.particle[i] = g.particle[g.n-1];
-            --g.n;
+        if (sqrt(squared_x + squared_y) < g.circle.radius)
+        {
+            p->velocity.y = -p->velocity.y;
+            p->velocity.y *= (((float)rand() / (4 * (float)RAND_MAX)) + 0.2);
+
+            if (p->s.center.x < g.circle.center.x)
+                p->velocity.x -= 0.1;
+            else
+                p->velocity.x += 0.1;
         }
+        */
+
     }
 }
-
 
 void render()
 {
@@ -360,51 +406,71 @@ void render()
     //Draw shapes...
     //draw the box
     Shape *s;
-    glColor3ub(90,140,90);
-    s = &g.box;
-    
-    glPushMatrix();
-    glTranslatef(s->center.x, s->center.y, s->center.z);
-    
+    glColor3ub(90, 140, 90);
+    s = &g.box[0];
+
     float w, h;
     w = s->width;
     h = s->height;
-   
-    glBegin(GL_QUADS);
-    
-    glVertex2i(-w, -h);
-    glVertex2i(-w,  h);
-    glVertex2i( w,  h);
-    glVertex2i( w, -h);
-    
+
+    for (int i = 0; i < 5; i++) {
+
+        glColor3ub(90, 140, 90);
+        s = &g.box[i];
+
+        glPushMatrix();
+        glTranslatef(s->center.x, s->center.y, s->center.z);
+
+        glBegin(GL_QUADS);
+
+        glVertex2i(-w, -h);
+        glVertex2i(-w,  h);
+        glVertex2i( w,  h);
+        glVertex2i( w, -h);
+
+        glEnd();
+        glPopMatrix();
+
+        //Write Requirements on the box
+        Rect r;
+
+        r.bot = s->center.y - 7;
+        r.left = s->center.x - g.moveBox[i];
+        r.center = 0;
+
+        ggprint13(&r, 16, 0x00fffffff, g.boxText[i]);
+    }
+
+    /*
+    // Draw circle
+    float x, y;
+
+    glColor3ub(90, 140, 90);
+    glBegin(GL_TRIANGLE_FAN);
+    for (int i = 0; i < 180; i++)
+    {
+        x = g.circle.radius * cos(i) + g.circle.center.x;
+        y = g.circle.radius * sin(i) + g.circle.center.y;
+        glVertex3f(x, y, 0);
+
+        x = g.circle.radius * cos(i + 0.1) + g.circle.center.x;
+        y = g.circle.radius * sin(i + 0.1) + g.circle.center.y;
+        glVertex3f(x, y, 0);
+    }
+
     glEnd();
-    glPopMatrix();
-
-    //Write Requirements on the box
-    Rect r;
-    
-    r.bot = s->center.y - 7;
-    r.left = s->center.x - 40;
-    r.center = 0;
-    
-    /* 
-    r.bot = g.yres - 40;
-    r.left = 10;
-    r.center = 0;
     */
-
-    ggprint13(&r, 16, 0x00fffffff, "Requirements");
 
     //Draw particles here
     //if (g.n > 0) {
     for(int i =0; i<g.n; i++) {
         //There is at least one particle to draw.
         glPushMatrix();
-        glColor3ub(150,160,220);
-      
+        glColor3ub(150, 160, 220);
+
         Vec *c = &g.particle[i].s.center;
         w = h = 2;
-      
+
         glBegin(GL_QUADS);
 
         glVertex2i(c->x-w, c->y-h);
@@ -415,7 +481,6 @@ void render()
         glEnd();
         glPopMatrix();
     }
-    //
     //Draw your 2D text here
 
 }
